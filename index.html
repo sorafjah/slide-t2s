@@ -65,7 +65,7 @@
                         <div>
                            <h2 class="text-xl font-semibold mb-3">1. スライドデータの準備</h2>
                             <p class="text-sm text-gray-600 mb-2">以下のGPTsを使って、文章からスライド用のJSONデータを生成できます。</p>
-                            <a href="https://chatgpt.com/g/g-68eb6abcec308191aa86a0bb98f47865-tekisutojsonhua" target="_blank" rel="noopener noreferrer" class="text-indigo-600 hover:text-indigo-800 underline font-medium">テキストJSON化GPTsを開く</a>
+                            <a href="https://chatgpt.com/g/g-68eb6abcec3081aa86a0bb98f47865-tekisutojsonhua" target="_blank" rel="noopener noreferrer" class="text-indigo-600 hover:text-indigo-800 underline font-medium">テキストJSON化GPTsを開く</a>
                         </div>
                         <div>
                             <label for="json-input" class="block text-lg font-semibold mb-2">2. JSONデータを貼り付け</label>
@@ -154,10 +154,20 @@
         // Firebaseのインスタンス
         let app, db, auth;
         
-        // 必須変数 (Canvas環境から提供される)
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-slide-app';
-        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
-        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+        // ★★★★★ ここを書き換えました ★★★★★
+        // GitHub Pagesなどで公開するためのFirebase設定
+        const firebaseConfig = {
+          apiKey: "AIzaSyBcRuejBykUMY1z0aug6YfMtTemccvRElc",
+          authDomain: "slide-t2s.firebaseapp.com",
+          projectId: "slide-t2s",
+          storageBucket: "slide-t2s.firebasestorage.app",
+          messagingSenderId: "712571169987",
+          appId: "1:712571169987:web:4d01a34961dd961d4e4676",
+          measurementId: "G-7LTBNQ37HV"
+        };
+        
+        const appId = 'default-slide-app'; // GitHubで動かすため、固定のIDを設定
+        const initialAuthToken = null; // GitHubでは使わないのでnullに設定
 
         const SLIDES_COLLECTION_PATH = `/artifacts/${appId}/public/data/slides`;
 
@@ -173,7 +183,7 @@
             },
             viewer: {
                 slides: [],
-                currentSlideIndex: -1,
+                currentSlideIndex: -無効な API キーです。有効な API キーを渡してください。
                 slideName: '',
             }
         };
@@ -217,7 +227,7 @@
 
         // --- Firebase初期化と認証 ---
         async function initializeFirebase() {
-            if (!firebaseConfig) {
+            if (!firebaseConfig || !firebaseConfig.apiKey) {
                 dom.authStatus.innerHTML = '<p class="text-red-500">Firebase設定が見つかりません。</p>';
                 console.error("Firebase config is missing.");
                 return;
@@ -240,11 +250,9 @@
                     }
                 });
 
-                if (initialAuthToken) {
-                    await signInWithCustomToken(auth, initialAuthToken);
-                } else {
-                    await signInAnonymously(auth);
-                }
+                // GitHub Pagesなど外部環境では常に匿名認証を使う
+                await signInAnonymously(auth);
+
             } catch (error) {
                 console.error("Firebase initialization error:", error);
                 dom.authStatus.innerHTML = `<p class="text-red-500">Firebase初期化エラー: ${error.message}</p>`;
