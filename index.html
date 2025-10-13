@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>画像スライドメーカー</title>
+    <title>スライドメーカー</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         /* ローディングスピナー */
@@ -64,7 +64,6 @@
         <div id="app">
             <!-- ヘッダーとモード切替 -->
             <header class="mb-6">
-                <h1 class="text-3xl sm:text-4xl font-bold text-gray-900 mb-2">画像スライドメーカー</h1>
                 <p class="text-gray-600">JSONデータからスライドを作成し、保存・閲覧できます。</p>
                 <div id="auth-status" class="mt-2 text-xs text-gray-500">
                     <p>ステータス: 初期化中...</p>
@@ -125,8 +124,9 @@
                                 <span id="editor-slide-counter" class="text-gray-600 font-medium">0 / 0</span>
                                 <button id="editor-next-btn" class="bg-gray-200 text-gray-800 font-bold py-2 px-4 rounded-lg hover:bg-gray-300 transition">次へ &gt;</button>
                             </div>
-                            <div class="mt-4 text-center">
+                            <div class="mt-4 flex justify-center items-center gap-6">
                                 <button id="add-slide-btn" class="text-indigo-600 hover:text-indigo-800 font-medium">+ 新しいスライドを追加</button>
+                                <button id="delete-current-slide-btn" class="text-red-500 hover:text-red-700 font-medium">現在のスライドを削除</button>
                             </div>
                              <!-- 編集フォーム -->
                             <div id="slide-edit-form" class="mt-6 border-t pt-6 space-y-4">
@@ -221,6 +221,7 @@
             editorNextBtn: document.getElementById('editor-next-btn'),
             editorSlideCounter: document.getElementById('editor-slide-counter'),
             addSlideBtn: document.getElementById('add-slide-btn'),
+            deleteCurrentSlideBtn: document.getElementById('delete-current-slide-btn'),
             slideEditForm: document.getElementById('slide-edit-form'),
             textContentInput: document.getElementById('text-content-input'),
             imageUrlInput: document.getElementById('image-url-input'),
@@ -293,18 +294,16 @@
                 const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
 
                 if (firebaseConfigStr) {
-                    // 環境変数が存在する場合（推奨される実行環境）
                     firebaseConfig = JSON.parse(firebaseConfigStr);
                     appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
                 } else {
-                    // 環境変数が存在しない場合のフォールバック（GitHub Pagesなど）
                     console.warn("環境変数が提供されていません。コード内のデフォルトFirebase設定を使用します。");
                     
                     firebaseConfig = {
                         apiKey: "AIzaSyBCRuejBykUMYlz0aug6YfMtTemccvRElc",
                         authDomain: "slide-t2s.firebaseapp.com",
                         projectId: "slide-t2s",
-                        storageBucket: "slide-t2s.firebasestorage.app",
+                        storageBucket: "slide-t2s.appspot.com",
                         messagingSenderId: "712571169987",
                         appId: "1:712571169987:web:4d01a34961dd961d4e4676",
                         measurementId: "G-7LTBNQ37HV"
@@ -341,7 +340,6 @@
                 console.error("Firebase initialization error:", error);
                 showNotification(`Firebase初期化エラー: ${error.message}`, 'error', 10000);
                 dom.authStatus.innerHTML = `<p class="text-red-500">Firebase初期化エラー</p>`;
-                // エラー時はアプリの操作を不能にする
                 document.querySelectorAll('button, input, textarea').forEach(el => el.disabled = true);
             }
         }
@@ -409,34 +407,27 @@
         
         function createSlideHTML(slide, isViewer = false) {
             const hasImage = slide.image_url && slide.image_url.trim() !== '';
+            const textHTML = (slide.text_content || '').replace(/\n/g, '<br>');
 
             // --- Viewer Mode ---
             if (isViewer) {
                 if (hasImage) {
-                    // Viewer with Image: Grid layout for overlay.
                     return `
-                        <div class="w-full h-full grid grid-cols-1 grid-rows-1 overflow-hidden bg-black rounded-xl">
-                            <!-- Image Layer (behind) -->
-                            <div class="col-start-1 row-start-1 w-full h-full flex items-center justify-center opacity-90">
+                        <div class="w-full h-full flex flex-col justify-between bg-white rounded-xl overflow-hidden">
+                            <div class="w-full flex-grow flex items-center justify-center overflow-hidden p-4">
                                 <img src="${slide.image_url}" 
-                                     class="w-full h-full object-cover"
-                                     onerror="this.parentElement.innerHTML = '<div class=\\'w-full h-full flex items-center justify-center text-white/50\\'>画像表示エラー</div>';">
+                                     class="max-w-full max-h-full object-contain"
+                                     onerror="this.parentElement.innerHTML = '<div class=\\'w-full h-full flex items-center justify-center text-gray-500\\'>画像表示エラー</div>';">
                             </div>
-                            <!-- Text Protection Gradient (middle) -->
-                            <div class="col-start-1 row-start-1 w-full h-full bg-gradient-to-t from-black/80 via-black/40 to-transparent"></div>
-                            <!-- Text Layer (front) -->
-                            <div class="col-start-1 row-start-1 w-full h-full flex items-end justify-center p-6 md:p-8">
-                                <p class="text-xl md:text-2xl lg:text-3xl text-white text-center break-words w-full font-semibold" style="text-shadow: 1px 1px 3px rgba(0,0,0,0.5);">
-                                    ${slide.text_content || ''}
-                                </p>
+                            <div class="w-full p-6 bg-white border-t">
+                                <p class="text-xl md:text-2xl text-center break-words text-gray-800">${textHTML}</p>
                             </div>
                         </div>
                     `;
                 } else {
-                    // Viewer with Text only: Simple centered text.
                     return `
                         <div class="w-full h-full flex items-center justify-center p-8 bg-white rounded-xl">
-                             <p class="text-2xl md:text-3xl lg:text-4xl text-center break-words text-gray-800">${slide.text_content || ''}</p>
+                             <p class="text-2xl md:text-3xl lg:text-4xl text-center break-words text-gray-800">${textHTML}</p>
                         </div>
                     `;
                 }
@@ -444,24 +435,26 @@
             
             // --- Editor Mode ---
             else {
-                let imageHTML;
                 if (hasImage) {
-                    imageHTML = `<img src="${slide.image_url}" class="max-w-full max-h-full object-contain" onerror="this.outerHTML = '<div class=\\'text-red-500 p-4\\'>画像表示エラー</div>'">`;
+                    // With image, text at the bottom
+                    return `
+                        <div class="w-full h-full flex flex-col justify-between bg-gray-50 rounded-lg overflow-hidden border">
+                            <div class="w-full flex-grow flex items-center justify-center overflow-hidden p-2">
+                                <img src="${slide.image_url}" class="max-w-full max-h-full object-contain" onerror="this.outerHTML = '<div class=\\'text-red-500\\'>画像表示エラー</div>';">
+                            </div>
+                            <div class="w-full p-3 bg-white">
+                                <p class="text-center text-sm text-gray-800 break-words">${textHTML}</p>
+                            </div>
+                        </div>
+                    `;
                 } else {
-                    imageHTML = `<span class="text-gray-400">画像なし</span>`;
+                    // Text only, centered
+                    return `
+                        <div class="w-full h-full flex items-center justify-center bg-gray-50 rounded-lg border p-4">
+                            <p class="text-center text-gray-800 break-words">${textHTML}</p>
+                        </div>
+                    `;
                 }
-
-                // Editor layout: Image on top, text below. No overlap.
-                return `
-                    <div class="w-full h-full flex flex-col bg-gray-50 rounded-lg overflow-hidden border">
-                        <div class="flex-grow w-full relative bg-gray-200 flex items-center justify-center">
-                            ${imageHTML}
-                        </div>
-                        <div class="w-full p-2 border-t border-gray-200 bg-white">
-                            <p class="text-center text-sm text-gray-800 break-words h-10 overflow-y-auto">${slide.text_content || ''}</p>
-                        </div>
-                    </div>
-                `;
             }
         }
         
@@ -473,14 +466,30 @@
 
         function handleImportJson() {
             try {
-                const slidesData = JSON.parse(dom.jsonInput.value);
+                let jsonText = dom.jsonInput.value.trim();
+                if (!jsonText) {
+                    showNotification('JSONデータが空です。', 'error');
+                    return;
+                }
+                 // Remove trailing commas from objects and arrays, which is a common JSON error.
+                jsonText = jsonText.replace(/,(?=\s*[}\]])/g, '');
+
+                const slidesData = JSON.parse(jsonText);
                 if (!Array.isArray(slidesData)) {
                     throw new Error("データは配列形式である必要があります。");
                 }
-                state.editor.slides = slidesData.map(s => ({
-                    text_content: s.text_content || "",
-                    image_url: s.image_url || ""
-                }));
+                // Be more flexible with property names from JSON
+                state.editor.slides = slidesData.map(s => {
+                    // text_content, text, content, 文章, テキスト などのキーを認識
+                    const text = s.text_content || s.text || s.content || s.文章 || s.テキスト || "";
+                    // image_url, imageUrl, image, 画像URL, 画像 などのキーを認識
+                    const image = s.image_url || s.imageUrl || s.image || s.画像URL || s.画像 || "";
+                    return { 
+                        text_content: String(text), // 値を文字列に変換して安全性を高める
+                        image_url: String(image) 
+                    };
+                });
+
                 state.editor.currentSlideIndex = state.editor.slides.length > 0 ? 0 : -1;
                 state.editor.slideName = ''; 
                 state.editor.loadedDocId = null;
@@ -498,6 +507,25 @@
             renderEditor();
         }
         
+        function handleDeleteCurrentSlide() {
+            const { slides, currentSlideIndex } = state.editor;
+            if (slides.length === 0 || currentSlideIndex === -1) {
+                showNotification("削除するスライドがありません。", 'info');
+                return;
+            }
+
+            slides.splice(currentSlideIndex, 1);
+
+            // Adjust index after deletion
+            if (currentSlideIndex >= slides.length) {
+                // If the last slide was deleted, move to the new last slide
+                state.editor.currentSlideIndex = slides.length - 1;
+            }
+            
+            showNotification("現在のスライドを削除しました。", 'success');
+            renderEditor();
+        }
+
         function handleEditorNav(direction) {
             const { slides } = state.editor;
             let newIndex = state.editor.currentSlideIndex + direction;
@@ -628,7 +656,7 @@
                 try {
                     await deleteDoc(doc(db, SLIDES_COLLECTION_PATH, loadedDocId));
                     showNotification("スライドを削除しました。", 'success');
-                    // 状態をリセット
+                    // Reset state
                     state.editor.slides = [];
                     state.editor.currentSlideIndex = -1;
                     state.editor.slideName = '';
@@ -684,6 +712,7 @@
             dom.tabViewer.addEventListener('click', () => handleModeChange('viewer'));
             dom.importJsonBtn.addEventListener('click', handleImportJson);
             dom.addSlideBtn.addEventListener('click', handleAddSlide);
+            dom.deleteCurrentSlideBtn.addEventListener('click', handleDeleteCurrentSlide);
             dom.editorPrevBtn.addEventListener('click', () => handleEditorNav(-1));
             dom.editorNextBtn.addEventListener('click', () => handleEditorNav(1));
             dom.textContentInput.addEventListener('input', handleSlideUpdate);
@@ -707,6 +736,5 @@
 
 </body>
 </html>
-
 
 
