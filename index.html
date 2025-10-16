@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>スライドメーカー</title>
+  <title>スライドメーカー（Googleドライブ対応）</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
     .loader{border:4px solid #f3f3f3;border-top:4px solid #4f46e5;border-radius:50%;width:40px;height:40px;animation:spin 1s linear infinite}
@@ -18,7 +18,6 @@
     .sortable-item.dragging{opacity:.5}
     .sortable-item.drop-target{outline:2px dashed #cbd5e1}
 
-    /* 編集プレビューは従来どおり 1.5倍 */
     .slide-text-scale{font-size:1.5em;line-height:1.35}
 
     .aspect-4-3{position:relative;width:100%}
@@ -137,7 +136,6 @@
                 </div>
               </div>
 
-              <!-- 追加：スライドの追加ボタン -->
               <div class="mt-4">
                 <button id="add-slide-btn" class="inline-flex items-center gap-1 px-3 py-2 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-200 hover:bg-indigo-100 text-sm">
                   ＋ スライドの追加
@@ -150,17 +148,12 @@
                   <label for="text-content-input" class="block text-sm font-medium text-gray-700">文章の内容</label>
                   <textarea id="text-content-input" rows="3" class="mt-1 w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"></textarea>
                 </div>
-
                 <div>
                   <label for="image-url-input" class="block text-sm font-medium text-gray-700">画像アドレス (URL)</label>
-                  <div class="flex gap-2">
-                    <input type="text" id="image-url-input" class="mt-1 w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500" placeholder="Googleドライブ共有URLもOK（自動変換）">
-                    <button id="image-url-normalize-btn" class="mt-1 px-3 py-2 text-xs border rounded whitespace-nowrap">URL整形</button>
-                  </div>
-                  <p class="text-[11px] text-gray-500 mt-1">※ Driveの共有リンクは自動で「画像直表示リンク」に変換、失敗時はサムネイルに自動フォールバックします。</p>
+                  <input type="text" id="image-url-input" class="mt-1 w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500" placeholder="空欄でもOKです">
                 </div>
 
-                <!-- このスライドだけ：文字サイズ（▲▼の順 & ▲=大きく / ▼=小さく） -->
+                <!-- このスライドだけ：文字サイズ -->
                 <div class="pt-2">
                   <label class="block text-sm font-semibold text-gray-700 mb-1">このスライドだけの文字サイズ（閲覧モード）</label>
                   <div class="flex items-center gap-2">
@@ -169,15 +162,13 @@
                     <button id="slide-cpl-reset" class="px-2 py-1 text-xs border rounded text-indigo-700">リセット</button>
                     <span class="text-xs text-gray-600">現在：<span id="slide-cpl-display">—</span> 文字/行（デッキ基準 <span id="deck-cpl-inline">25</span>）</span>
                   </div>
-                  <p class="text-[11px] text-gray-500 mt-1">※ **▲で文字を大きく（CPLを小さく）**、**▼で文字を小さく（CPLを大きく）**。範囲 15〜35。</p>
+                  <p class="text-[11px] text-gray-500 mt-1">※ ▲で文字を大きく（CPL小さく）／▼で小さく（CPL大きく）。範囲 15〜35。</p>
                 </div>
 
                 <!-- 並べ替え -->
                 <div class="pt-4">
                   <h3 class="text-sm font-semibold text-gray-700 mb-2">スライドの順番を変更（ドラッグ & ドロップ／▲▼）</h3>
-                  <ul id="reorder-list" class="divide-y divide-gray-200 rounded-lg border border-gray-200 overflow-hidden">
-                    <!-- JSで描画 -->
-                  </ul>
+                  <ul id="reorder-list" class="divide-y divide-gray-200 rounded-lg border border-gray-200 overflow-hidden"></ul>
                   <p class="text-xs text-gray-500 mt-2">※ タッチ操作の端末では▲▼ボタンの方が確実です。</p>
                 </div>
               </div>
@@ -192,7 +183,7 @@
             <p class="text-gray-600 mb-6">閲覧したいスライドの名前を入力してください。</p>
             <div class="flex gap-3">
               <input type="text" id="viewer-slide-name" class="flex-grow p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 transition" placeholder="例: 科学スライド_01">
-              <button id="start-viewer-btn" class="bg-indigo-500 text白 font-bold py-2 px-6 rounded-lg hover:bg-indigo-600 transition shadow">スライドをみる</button>
+              <button id="start-viewer-btn" class="bg-indigo-500 text-white font-bold py-2 px-6 rounded-lg hover:bg-indigo-600 transition shadow">スライドをみる</button>
             </div>
           </div>
 
@@ -232,7 +223,7 @@
       userId:null,
       editor:{slides:[],currentSlideIndex:-1,slideName:'',loadedDocId:null},
       viewer:{slides:[],currentSlideIndex:-1,slideName:''},
-      viewerSettings:{ cpl:25, minPx:18, maxPx:56 } // デッキ基準
+      viewerSettings:{ cpl:25, minPx:18, maxPx:56 }
     };
 
     const dom = {
@@ -260,7 +251,6 @@
       editorNextArrow:document.getElementById('editor-next-arrow'),
       textContentInput:document.getElementById('text-content-input'),
       imageUrlInput:document.getElementById('image-url-input'),
-      imageUrlNormalizeBtn:document.getElementById('image-url-normalize-btn'),
       viewerStartScreen:document.getElementById('viewer-start-screen'),
       viewerSlideNameInput:document.getElementById('viewer-slide-name'),
       startViewerBtn:document.getElementById('start-viewer-btn'),
@@ -271,11 +261,9 @@
       viewerBackBtn:document.getElementById('viewer-back-btn'),
       reorderList:document.getElementById('reorder-list'),
       addSlideBtn:document.getElementById('add-slide-btn'),
-
       viewerCplRange: document.getElementById('viewer-cpl-range'),
       viewerCplLabel: document.getElementById('viewer-cpl-label'),
       viewerCplPresets: document.getElementById('viewer-cpl-presets'),
-
       slideCplUp: document.getElementById('slide-cpl-up'),
       slideCplDown: document.getElementById('slide-cpl-down'),
       slideCplReset: document.getElementById('slide-cpl-reset'),
@@ -283,35 +271,9 @@
       deckCplInline: document.getElementById('deck-cpl-inline'),
     };
 
-    /* =========================
-       GoogleドライブURL 変換
-       ========================= */
-    function extractDriveId(urlStr){
-      try{
-        const u = new URL(urlStr.trim());
-        if(u.hostname.indexOf('google.com')===-1) return null;
-        // /file/d/<ID>/view ...
-        const m = u.pathname.match(/\/file\/d\/([^/]+)\//);
-        if(m && m[1]) return m[1];
-        // open?id=<ID>, uc?id=<ID> など
-        const id = u.searchParams.get('id');
-        if(id) return id;
-        return null;
-      }catch(_){ return null; }
-    }
-    function normalizeImageUrl(urlStr){
-      if(!urlStr) return urlStr;
-      const id = extractDriveId(urlStr);
-      if(id){
-        // まずは通常の「表示」直リンク
-        return `https://drive.google.com/uc?export=view&id=${id}`;
-      }
-      return urlStr.trim();
-    }
-
     function showNotification(message,type='info',duration=3000){
       dom.notificationMessage.textContent=message;
-      dom.notificationBanner.className='fixed top-0 left-1/2 -translate-x-1/2 w-full max-w-md p-4 mt-4 z-50 rounded-lg shadow-lg';
+      dom.notificationBanner.className='fixed top-0 left-1/2 -translate-x-1/2 w/full max-w-md p-4 mt-4 z-50 rounded-lg shadow-lg';
       if(type==='success'){dom.notificationBanner.classList.add('bg-green-100','text-green-800')}
       else if(type==='error'){dom.notificationBanner.classList.add('bg-red-100','text-red-800')}
       else{dom.notificationBanner.classList.add('bg-blue-100','text-blue-800')}
@@ -330,6 +292,75 @@
         dom.confirmCancelBtn.addEventListener('click',onCancel,{once:true});
       });
     }
+
+    // ====== ここから：Googleドライブ対応のコア ======
+    function normalizeImageUrl(raw){
+      if(!raw) return { url:"", ok:false, reason:"empty" };
+      const url = String(raw).trim();
+
+      // Google Photos（埋め込めない）
+      if(/^https?:\/\/photos\.google\.com\/photo\//.test(url)) return { url:"", ok:false, reason:"google_photos_page" };
+      if(/^https?:\/\/photos\.app\.goo\.gl\//.test(url)) return { url:"", ok:false, reason:"google_photos_share_link" };
+
+      // Google Drive パターン
+      let m = url.match(/https?:\/\/drive\.google\.com\/file\/d\/([^/]+)\//);
+      if(m && m[1]) return { url:`https://drive.google.com/uc?export=view&id=${m[1]}`, ok:true };
+      m = url.match(/https?:\/\/drive\.google\.com\/open\?id=([^&]+)/);
+      if(m && m[1]) return { url:`https://drive.google.com/uc?export=view&id=${m[1]}`, ok:true };
+      m = url.match(/https?:\/\/drive\.google\.com\/uc\?(?:[^#]*&)?id=([^&]+)/);
+      if(m && m[1]) return { url:`https://drive.google.com/uc?export=view&id=${m[1]}`, ok:true };
+
+      // Google Photos CDN（OK）
+      if(/^https?:\/\/lh3\.googleusercontent\.com\/[A-Za-z0-9_\-]/.test(url)){
+        if(!/[?=]/.test(url)) return { url: url + "=w1600", ok:true };
+        return { url, ok:true };
+      }
+
+      // fife（表示はするが不安定）
+      if(/^https?:\/\/photos\.fife\.usercontent\.google\.com\//.test(url)){
+        const replaced = url.replace(/\/s\d+(-no)?/i, "/s1600-no");
+        return { url: replaced, ok:true, warning:"fife_unstable" };
+      }
+
+      if(/^https?:\/\//.test(url)) return { url, ok:true };
+      return { url:"", ok:false, reason:"invalid" };
+    }
+
+    function getEmbedSrc(raw){
+      const {url, ok, reason, warning} = normalizeImageUrl(raw||"");
+      if(!ok){
+        if(reason==="google_photos_page" || reason==="google_photos_share_link"){
+          showNotification("GoogleフォトのURLは直接埋め込みできません。Driveの公開リンクをご利用ください。","error",5000);
+        }
+        if(reason==="invalid"){
+          showNotification("画像URLが不正です。https:// から始まるURLを入力してください。","error");
+        }
+        return "";
+      }
+      if(warning==="fife_unstable"){
+        showNotification("Googleフォトの一時リンクです。将来表示できなくなる可能性があります（Drive推奨）。","info",4000);
+      }
+      return url;
+    }
+
+    // onerrorフォールバック（uc? が失敗したら thumbnail へ）
+    window.__drvFallback = function(imgEl){
+      try{
+        const m = (imgEl?.src||"").match(/\/uc\?export=view&id=([^&]+)/);
+        if(m && m[1]){
+          imgEl.onerror = null; // 2回目は通知しない
+          imgEl.src = `https://drive.google.com/thumbnail?id=${m[1]}&sz=w1600`;
+        }else{
+          // それでも無理ならエラー表示
+          imgEl.outerHTML = '<div class="w-full h-full flex items-center justify-center text-gray-500">画像表示エラー</div>';
+        }
+      }catch(e){
+        imgEl.outerHTML = '<div class="w-full h-full flex items-center justify-center text-gray-500">画像表示エラー</div>';
+      }
+    };
+    // ====== ここまで：Googleドライブ対応のコア ======
+
+    let SLIDE_IMG_CLASS = "max-w-full max-h-full object-contain";
 
     // Firebase初期化
     async function initializeFirebase(){
@@ -390,37 +421,23 @@
       }
     }
 
-    // ★ Driveフォールバック付き画像タグを生成
-    function buildImgTag(src){
-      const id = extractDriveId(src);
-      const alt = id ? `https://drive.google.com/thumbnail?id=${id}&sz=w2000` : "";
-      const onerr = `
-        if(this.dataset.altSrc && !this.dataset.altTried){
-          this.dataset.altTried='1';
-          this.src=this.dataset.altSrc;
-        }else{
-          this.parentElement.innerHTML = '<div class=\\'w-full h-full flex items-center justify-center text-gray-500\\'>画像表示エラー</div>';
-        }
-      `;
-      return `
-        <img src="${src}"
-             ${alt ? `data-alt-src="${alt}"` : ""}
-             class="max-w-full max-h-full object-contain"
-             onerror="${onerr}">
-      `;
-    }
-
     function createSlideHTML(slide,isViewer=false){
-      const hasImage=slide.image_url && slide.image_url.trim()!=='';
+      const hasImage = !!(slide.image_url && slide.image_url.trim()!=='');
+      const src = hasImage ? getEmbedSrc(slide.image_url) : "";
       const textHTML=(slide.text_content||'').replace(/\n/g,'<br>');
-      const imgTag = hasImage ? buildImgTag(slide.image_url) : "";
+
+      const imgTag = src
+        ? `<img src="${src}" class="${SLIDE_IMG_CLASS}"
+                 alt=""
+                 onerror="window.__drvFallback && window.__drvFallback(this)">`
+        : '';
 
       if(isViewer){
-        if(hasImage){
+        if(src){
           return `
             <div class="w-full h-full flex flex-col justify-between bg-white rounded-xl overflow-hidden">
               <div class="w-full flex-grow flex items-center justify-center overflow-hidden p-4">
-                ${imgTag}
+                ${imgTag || '<div class="w-full h-full flex items-center justify-center text-gray-500">画像なし</div>'}
               </div>
               <div class="w-full p-6 bg-white">
                 <p class="text-center break-words text-gray-800 auto-size-text" style="line-height:1.3;">${textHTML}</p>
@@ -435,11 +452,11 @@
           `;
         }
       }else{
-        if(hasImage){
+        if(src){
           return `
             <div class="w-full h-full flex flex-col justify-between bg-gray-50 rounded-lg overflow-hidden">
               <div class="w-full flex-grow flex items-center justify-center overflow-hidden p-2">
-                ${imgTag}
+                ${imgTag || '<div class="text-gray-500">画像表示エラー</div>'}
               </div>
               <div class="w-full p-3 bg-white border-t">
                 <p class="slide-text-scale text-center text-gray-800 break-words">${textHTML}</p>
@@ -456,7 +473,6 @@
       }
     }
 
-    // 有効CPL
     function getEffectiveCpl(slide){
       const deck = state.viewerSettings?.cpl ?? 25;
       const ov = (slide && typeof slide.cpl==='number') ? slide.cpl : null;
@@ -497,7 +513,6 @@
       }
     }
 
-    // 並べ替えUI
     function renderReorderList(){
       const {slides,currentSlideIndex}=state.editor;
       const ul=dom.reorderList; ul.innerHTML='';
@@ -600,21 +615,8 @@
     }
     window.addEventListener('resize',()=>{ if(!dom.viewerView.classList.contains('hidden')) autoSizeViewerText(); });
 
-    // --------- 入出力など ---------
+    // 入出力など
     function handleModeChange(newMode){state.mode=newMode; render()}
-
-    function tryNormalizeAndSetImageUrl(raw){
-      const normalized = normalizeImageUrl(raw);
-      if(normalized !== raw.trim()){
-        showNotification('Googleドライブの共有URLを画像直表示リンクに変換しました。','success');
-      }
-      const i = state.editor.currentSlideIndex;
-      if(i!==-1){
-        state.editor.slides[i].image_url = normalized;
-        dom.imageUrlInput.value = normalized;
-        dom.editorSlideContainer.innerHTML = createSlideHTML(state.editor.slides[i]);
-      }
-    }
 
     function handleImportJson(){
       try{
@@ -626,9 +628,9 @@
         state.editor.slides=slidesData.map(s=>{
           const text=s.text_content||s.text||s.content||s.文章||s.テキスト||"";
           const imageRaw=s.image_url||s.imageUrl||s.image||s.画像URL||s.画像||"";
-          const image = normalizeImageUrl(String(imageRaw||""));
+          const normalized = getEmbedSrc(String(imageRaw));
           const cpl = (typeof s.cpl==='number') ? s.cpl : undefined;
-          return {text_content:String(text),image_url:image, ...(typeof cpl==='number'?{cpl}:{} )};
+          return {text_content:String(text),image_url: normalized || String(imageRaw), ...(typeof cpl==='number'?{cpl}:{} )};
         });
         state.editor.currentSlideIndex=state.editor.slides.length>0?0:-1;
         state.editor.slideName=''; state.editor.loadedDocId=null;
@@ -647,6 +649,7 @@
       const {slides,currentSlideIndex}=state.editor;
       if(currentSlideIndex!==-1){
         slides[currentSlideIndex].text_content=dom.textContentInput.value;
+        slides[currentSlideIndex].image_url=dom.imageUrlInput.value; // 入力時はそのまま保持（表示側で正規化）
         dom.editorSlideContainer.innerHTML=createSlideHTML(slides[currentSlideIndex]);
         renderReorderList();
       }
@@ -666,14 +669,19 @@
       if(state.editor.slides.length===0){showNotification("保存するスライドがありません。",'error');return}
       if(!auth.currentUser){showNotification("認証が完了していません。",'error');return}
 
-      // 念のため全スライドの画像URLを最終正規化
-      state.editor.slides = state.editor.slides.map(s=>({
-        ...s, image_url: normalizeImageUrl(s.image_url||'')
-      }));
+      // ★ 保存前にURLを正規化してから保存
+      const slidesToSave = state.editor.slides.map(s=>{
+        const normalized = getEmbedSrc(s.image_url||"");
+        return {
+          text_content: s.text_content||"",
+          image_url: normalized || "",
+          ...(typeof s.cpl==='number'? {cpl:s.cpl} : {})
+        };
+      });
 
       const dataToSave={
         slideName,
-        slides:state.editor.slides,
+        slides: slidesToSave,
         authorId:state.userId,
         viewerSettings: state.viewerSettings,
         updatedAt:new Date().toISOString(),
@@ -718,7 +726,7 @@
           const data=slideDoc.data();
           state.editor.slides=(data.slides||[]).map(s=>({
             text_content:s.text_content||"",
-            image_url: normalizeImageUrl(s.image_url||""),
+            image_url:s.image_url||"",
             ...(typeof s.cpl==='number'?{cpl:s.cpl}:{})
           }));
           state.editor.currentSlideIndex=data.slides.length>0?0:-1;
@@ -741,6 +749,24 @@
       }
     }
 
+    async function handleDeleteSlides(){
+      const {loadedDocId,slideName}=state.editor;
+      if(!loadedDocId) return;
+      const confirmed=await showConfirm(`本当にスライド「${slideName}」を削除しますか？この操作は元に戻せません。`);
+      if(confirmed){
+        try{
+          await deleteDoc(doc(db,SLIDES_COLLECTION_PATH,loadedDocId));
+          showNotification("スライドを削除しました。",'success');
+          state.editor.slides=[]; state.editor.currentSlideIndex=-1;
+          state.editor.slideName=''; state.editor.loadedDocId=null;
+          dom.slideNameInput.value='';
+          renderEditor();
+        }catch(e){
+          console.error(e); showNotification("スライドの削除に失敗しました。",'error');
+        }
+      }
+    }
+
     async function handleStartViewer(){
       const slideName=dom.viewerSlideNameInput.value.trim();
       if(!slideName){showNotification("スライド名を入力してください。",'error');return}
@@ -751,7 +777,7 @@
           const data=slideDoc.data();
           state.viewer.slides=(data.slides||[]).map(s=>({
             text_content:s.text_content||"",
-            image_url: normalizeImageUrl(s.image_url||""),
+            image_url:s.image_url||"",
             ...(typeof s.cpl==='number'?{cpl:s.cpl}:{})
           }));
           state.viewer.currentSlideIndex=data.slides.length>0?0:-1;
@@ -780,7 +806,6 @@
       dom.viewerSlideNameInput.value=''; renderViewer();
     }
 
-    // ---------- Deck-level CPL UI ----------
     function syncDeckCplUI(cpl){
       state.viewerSettings.cpl = clamp(cpl, CPL_MIN, CPL_MAX);
       dom.viewerCplRange.value = String(state.viewerSettings.cpl);
@@ -807,7 +832,6 @@
       });
     }
 
-    // ---------- Per-slide CPL UI ----------
     function setupPerSlideSizeControls(){
       dom.slideCplUp.addEventListener('click',()=>{
         const i = state.editor.currentSlideIndex; if(i<0) return;
@@ -834,26 +858,7 @@
       dom.tabViewer.addEventListener('click',()=>handleModeChange('viewer'));
       dom.importJsonBtn.addEventListener('click',handleImportJson);
       dom.textContentInput.addEventListener('input',handleSlideUpdate);
-
-      // 画像URL欄：入力で正規化 & プレビュー更新
-      dom.imageUrlInput.addEventListener('input', (e)=>{
-        const raw = e.target.value || '';
-        const normalized = normalizeImageUrl(raw);
-        if(normalized !== raw.trim()){
-          e.target.value = normalized;
-          const i = state.editor.currentSlideIndex;
-          if(i!==-1){ state.editor.slides[i].image_url = normalized; }
-          showNotification('Googleドライブの共有URLを画像直表示リンクに変換しました。','success');
-          renderEditor();
-        }else{
-          const i = state.editor.currentSlideIndex;
-          if(i!==-1){ state.editor.slides[i].image_url = raw.trim(); }
-          renderEditor();
-        }
-      });
-      dom.imageUrlNormalizeBtn.addEventListener('click', ()=>{
-        tryNormalizeAndSetImageUrl(dom.imageUrlInput.value||'');
-      });
+      dom.imageUrlInput.addEventListener('input',handleSlideUpdate);
 
       dom.editorPrevArrow.addEventListener('click',()=>handleEditorNav(-1));
       dom.editorNextArrow.addEventListener('click',()=>handleEditorNav(1));
