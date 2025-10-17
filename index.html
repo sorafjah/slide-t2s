@@ -117,13 +117,14 @@
                 </div>
                 <p class="text-xs text-gray-500 mt-2">※ 小さくすると文字が大きく表示されます。</p>
 
-                <!-- ★ 追加：テキストを書き出してコピー -->
+                <!-- ▼▼▼ ここが追加：テキストコピー出力ボタン ▼▼▼ -->
                 <div class="mt-3">
-                  <button id="copy-deck-text-btn" class="px-3 py-1.5 rounded-md border border-gray-300 hover:bg-gray-50 text-sm">
+                  <button id="copy-deck-text-btn" class="px-3 py-1.5 rounded-lg border hover:bg-gray-100">
                     テキストを書き出してコピー
                   </button>
-                  <span class="text-xs text-gray-500 ml-2">（表示せずクリップボードへ）</span>
+                  <span class="text-xs text-gray-500 ml-2">（表示せず、クリップボードにコピーします）</span>
                 </div>
+                <!-- ▲▲▲ 追加ここまで ▲▲▲ -->
               </div>
             </div>
 
@@ -277,8 +278,9 @@
       viewerBackBtn: document.getElementById('viewer-back-btn'),
       viewerStartScreen: document.getElementById('viewer-start-screen'),
       viewerSlideScreen: document.getElementById('viewer-slide-screen'),
-      // ★ 追加
+      /* ▼ 追加 */
       copyDeckTextBtn: document.getElementById('copy-deck-text-btn'),
+      /* ▲ 追加ここまで */
     };
 
     function showNotification(message, type = 'info', duration = 3000) {
@@ -355,7 +357,6 @@
       return url;
     }
 
-    // Drive画像のフォールバック
     window.__drvFallback = function(imgEl) {
       try {
         const m = (imgEl?.src || "").match(/\/uc\?export=view&id=([^&]+)/);
@@ -481,4 +482,600 @@
         if (src) {
           return `
             <div class="w-full h-full flex flex-col justify-between bg-white rounded-xl overflow-hidden">
-              <div class="w-full flex-grow flex items-center justify-center overflow-hidden p-
+              <div class="w-full flex-grow flex items-center justify-center overflow-hidden p-4">
+                ${imgTag || '<div class="w-full h-full flex items-center justify-center text-gray-500">画像なし</div>'}
+              </div>
+              <div class="w-full p-6 bg-white">
+                <p class="auto-size-text text-center break-words text-gray-800" style="line-height:1.3;">${textHTML}</p>
+              </div>
+            </div>
+          `;
+        } else {
+          return `
+            <div class="w-full h-full flex items-center justify-center p-8 bg-white rounded-xl">
+              <p class="auto-size-text text-center break-words text-gray-800" style="line-height:1.3;">${textHTML}</p>
+            </div>
+          `;
+        }
+      } else {
+        if (src) {
+          return `
+            <div class="w-full h-full flex flex-col justify-between bg-gray-50 rounded-lg overflow-hidden">
+              <div class="w-full flex-grow flex items-center justify-center overflow-hidden p-2">
+                ${imgTag || '<div class="text-gray-500">画像表示エラー</div>'}
+              </div>
+              <div class="w-full p-3 bg-white border-t">
+                <p class="auto-size-text text-center break-words text-gray-800" style="line-height:1.3;">${textHTML}</p>
+              </div>
+            </div>
+          `;
+        } else {
+          return `
+            <div class="w-full h-full flex items-center justify-center bg-gray-50 rounded-lg border p-4">
+              <p class="auto-size-text text-center break-words text-gray-800" style="line-height:1.3;">${textHTML}</p>
+            </div>
+          `;
+        }
+      }
+    }
+
+    function renderEditor() {
+      const { slides, currentSlideIndex, slideName, loadedDocId } = state.editor;
+      dom.slideNameInput.value = slideName;
+      dom.deckCplInline.textContent = state.viewerSettings.cpl;
+
+      if (slides.length === 0 || currentSlideIndex === -1) {
+        dom.editorSlideContainer.innerHTML = `<p class="text-gray-500">スライドがありません。JSONをインポートするか、新しいスライドを追加してください。</p>`;
+        document.getElementById('slide-edit-form')?.classList.add('hidden');
+      } else {
+        const slide = slides[currentSlideIndex];
+        dom.editorSlideContainer.innerHTML = createSlideHTML(slide, false);
+        document.getElementById('slide-edit-form')?.classList.remove('hidden');
+        dom.textContentInput.value = slide.text_content || "";
+        dom.imageUrlInput.value = slide.image_url || "";
+        dom.slideCplDisplay.textContent = String(getEffectiveCpl(slide));
+      }
+      dom.deleteSlideContainer.classList.toggle('hidden', !loadedDocId);
+      renderReorderList();
+      autoSizeEditorText();
+    }
+
+    function renderViewer() {
+      const { slides, currentSlideIndex } = state.viewer;
+      if (slides.length === 0) {
+        dom.viewerStartScreen.classList.remove('hidden');
+        dom.viewerSlideScreen.classList.add('hidden');
+      } else {
+        dom.viewerStartScreen.classList.add('hidden');
+        dom.viewerSlideScreen.classList.remove('hidden');
+        const slide = slides[currentSlideIndex];
+        dom.viewerSlideContainer.innerHTML = createSlideHTML(slide, true);
+        autoSizeViewerText();
+      }
+    }
+
+    function renderReorderList() {
+      const { slides, currentSlideIndex } = state.editor;
+      const ul = dom.reorderList;
+      ul.innerHTML = "";
+      slides.forEach((s, i) => {
+        const li = document.createElement('li');
+        li.className = `sortable-item flex items-center justify-between gap-3 px-3 py-2 bg-white ${(i === currentSlideIndex) ? 'bg-indigo-50' : ''}`;
+        li.setAttribute('draggable', 'true');
+        li.dataset.index = String(i);
+
+        const label = document.createElement('div');
+        label.className = 'flex items-center gap-2 min-w-0';
+        label.innerHTML = `
+          <span class="cursor-grab select-none text-gray-400">≡</span>
+          <span class="text-xs text-gray-500 shrink-0">${i + 1}</span>
+          <span class="text-sm text-gray-800 truncate">${(s.text_content || '').replace(/\n/g, ' ').slice(0, 40) || '（無題）'}</span>
+        `;
+
+        const btns = document.createElement('div');
+        btns.className = 'shrink-0 flex items-center gap-1';
+        btns.innerHTML = `
+          <button class="btn-up text-gray-600 hover:text-gray-800 px-2 py-1 text-xs border border-gray-200 rounded">▲</button>
+          <button class="btn-down text-gray-600 hover:text-gray-800 px-2 py-1 text-xs border border-gray-200 rounded">▼</button>
+          <button class="btn-jump text-gray-600 hover:text-gray-800 px-2 py-1 text-xs border border-gray-200 rounded">移動</button>
+          <button class="btn-delete text-red-600 hover:text-red-800 px-2 py-1 text-xs border border-red-200 rounded">削除</button>
+        `;
+
+        li.appendChild(label);
+        li.appendChild(btns);
+        ul.appendChild(li);
+
+        btns.querySelector('.btn-up').addEventListener('click', () => moveSlide(i, Math.max(0, i - 1)));
+        btns.querySelector('.btn-down').addEventListener('click', () => moveSlide(i, Math.min(slides.length - 1, i + 1)));
+        btns.querySelector('.btn-jump').addEventListener('click', () => {
+          const toStr = prompt(`スライド ${i + 1} を何番目に移動しますか？(1-${slides.length})`, String(i + 1));
+          const to = Number(toStr) - 1;
+          if (!Number.isNaN(to) && to >= 0 && to < slides.length) moveSlide(i, to);
+        });
+        btns.querySelector('.btn-delete').addEventListener('click', async () => {
+          const ok = await showConfirm(`スライド ${i + 1} を削除します。よろしいですか？`);
+          if (ok) deleteSlideAt(i);
+        });
+
+        li.addEventListener('dragstart', e => { li.classList.add('dragging'); e.dataTransfer?.setData('text/plain', String(i)) });
+        li.addEventListener('dragend', () => li.classList.remove('dragging'));
+        li.addEventListener('dragover', e => { e.preventDefault(); li.classList.add('drop-target') });
+        li.addEventListener('dragleave', () => li.classList.remove('drop-target'));
+        li.addEventListener('drop', e => {
+          e.preventDefault(); li.classList.remove('drop-target');
+          const from = Number(e.dataTransfer?.getData('text/plain'));
+          const to = Number(li.dataset.index);
+          if (!Number.isNaN(from) && !Number.isNaN(to)) moveSlide(from, to);
+        });
+
+        label.addEventListener('click', () => { state.editor.currentSlideIndex = i; renderEditor(); });
+      });
+    }
+
+    function moveSlide(from, to) {
+      const arr = state.editor.slides;
+      if (from === to || from < 0 || to < 0 || from >= arr.length || to >= arr.length) return;
+      const [moved] = arr.splice(from, 1);
+      arr.splice(to, 0, moved);
+      const cur = state.editor.currentSlideIndex;
+      if (cur === from) {
+        state.editor.currentSlideIndex = to;
+      } else if (from < cur && to >= cur) {
+        state.editor.currentSlideIndex = cur - 1;
+      } else if (from > cur && to <= cur) {
+        state.editor.currentSlideIndex = cur + 1;
+      }
+      renderEditor();
+      showNotification(`スライド ${from + 1} → ${to + 1} に移動しました。`, 'success');
+    }
+
+    function deleteSlideAt(index) {
+      const arr = state.editor.slides;
+      if (index < 0 || index >= arr.length) return;
+      arr.splice(index, 1);
+      if (arr.length === 0) {
+        state.editor.currentSlideIndex = -1;
+      } else if (state.editor.currentSlideIndex >= arr.length) {
+        state.editor.currentSlideIndex = arr.length - 1;
+      }
+      renderEditor();
+      showNotification(`スライド ${index + 1} を削除しました。`, 'success');
+    }
+
+    function addSlide() {
+      const cur = state.editor.currentSlideIndex;
+      const pos = (cur >= 0) ? cur + 1 : 0;
+      state.editor.slides.splice(pos, 0, { text_content: "（新しいスライド）", image_url: "" });
+      state.editor.currentSlideIndex = pos;
+      renderEditor();
+      showNotification("新しいスライドを追加しました。", 'success');
+    }
+
+    async function removeCurrentSlide() {
+      const i = state.editor.currentSlideIndex;
+      if (i < 0 || state.editor.slides.length === 0) {
+        showNotification("削除できるスライドがありません。", 'error');
+        return;
+      }
+      const ok = await showConfirm(`スライド ${i + 1} を削除します。よろしいですか？`);
+      if (!ok) return;
+      deleteSlideAt(i);
+    }
+
+    function handleModeChange(newMode) {
+      state.mode = newMode;
+      render();
+    }
+
+    function handleEditorNav(dir) {
+      const { slides } = state.editor;
+      const newIndex = state.editor.currentSlideIndex + dir;
+      if (newIndex >= 0 && newIndex < slides.length) {
+        state.editor.currentSlideIndex = newIndex;
+        renderEditor();
+      }
+    }
+
+    function handleImportJson() {
+      try {
+        let jsonText = dom.jsonInput.value.trim();
+        if (!jsonText) {
+          showNotification('JSONデータが空です。', 'error');
+          return;
+        }
+        jsonText = jsonText.replace(/,(?=\s*[}\]])/g, '');
+        const slidesData = JSON.parse(jsonText);
+        if (!Array.isArray(slidesData)) throw new Error("配列形式である必要があります。");
+        state.editor.slides = slidesData.map(s => {
+          const text = s.text_content || s.text || s.content || s.文章 || s.テキスト || "";
+          const raw = s.image_url || s.imageUrl || s.image || s.画像URL || s.画像 || "";
+          const normalized = getEmbedSrc(String(raw));
+          const cpl = (typeof s.cpl === 'number') ? s.cpl : undefined;
+          return { text_content: String(text), image_url: normalized || String(raw), ...(typeof cpl === 'number' ? { cpl } : {}) };
+        });
+        state.editor.currentSlideIndex = state.editor.slides.length > 0 ? 0 : -1;
+        state.editor.slideName = '';
+        state.editor.loadedDocId = null;
+        showNotification(`${state.editor.slides.length} 件のスライドを読み込みました。`, 'success');
+        renderEditor();
+      } catch (e) {
+        showNotification(`JSON解析エラー: ${e.message}`, 'error');
+      }
+    }
+
+    async function findSlidesByName(name) {
+      if (!name || name.trim() === "") return null;
+      const qy = query(collection(db, SLIDES_COLLECTION_PATH), where("slideName", "==", name.trim()));
+      const snap = await getDocs(qy);
+      return snap.empty ? null : snap.docs[0];
+    }
+
+    // 望む動き：別名保存（Aを残す）
+    async function handleSaveSlides() {
+      const slideName = dom.slideNameInput.value.trim();
+      if (!slideName) {
+        showNotification("スライド名を入力してください。", 'error');
+        return;
+      }
+      if (state.editor.slides.length === 0) {
+        showNotification("保存するスライドがありません。", 'error');
+        return;
+      }
+      if (!auth.currentUser) {
+        showNotification("認証されていません。", 'error');
+        return;
+      }
+
+      const slidesToSave = state.editor.slides.map(s => {
+        const normalized = getEmbedSrc(s.image_url || "");
+        return {
+          text_content: s.text_content || "",
+          image_url: normalized || "",
+          ...(typeof s.cpl === 'number' ? { cpl: s.cpl } : {})
+        };
+      });
+
+      const dataToSave = {
+        slideName,
+        slides: slidesToSave,
+        authorId: state.userId,
+        viewerSettings: state.viewerSettings,
+        updatedAt: new Date().toISOString()
+      };
+
+      const loadedId = state.editor.loadedDocId;
+      const loadedName = state.editor.slideName || "";
+
+      try {
+        dom.saveSlidesBtn.disabled = true;
+        dom.saveSlidesBtn.textContent = "保存中...";
+
+        const existingDoc = await findSlidesByName(slideName);
+        const isRenaming = !!loadedId && slideName !== loadedName;
+
+        if (!loadedId) {
+          if (existingDoc) {
+            const ok = await showConfirm(`「${slideName}」は既に存在します。上書きしますか？`);
+            if (!ok) return;
+            await updateDoc(doc(db, SLIDES_COLLECTION_PATH, existingDoc.id), dataToSave);
+            state.editor.loadedDocId = existingDoc.id;
+            state.editor.slideName = slideName;
+            showNotification("スライドを上書き保存しました。", 'success');
+          } else {
+            dataToSave.createdAt = new Date().toISOString();
+            const docRef = await addDoc(collection(db, SLIDES_COLLECTION_PATH), dataToSave);
+            state.editor.loadedDocId = docRef.id;
+            state.editor.slideName = slideName;
+            showNotification("新しいスライドを保存しました。", 'success');
+          }
+        } else {
+          if (isRenaming) {
+            if (existingDoc) {
+              const ok = await showConfirm(`「${slideName}」は既に存在します。上書きしますか？（元のスライドは保持されます）`);
+              if (!ok) return;
+              await updateDoc(doc(db, SLIDES_COLLECTION_PATH, existingDoc.id), dataToSave);
+              state.editor.loadedDocId = existingDoc.id;
+              state.editor.slideName = slideName;
+              showNotification("既存スライドを上書き保存しました。", 'success');
+            } else {
+              dataToSave.createdAt = new Date().toISOString();
+              const docRef = await addDoc(collection(db, SLIDES_COLLECTION_PATH), dataToSave);
+              state.editor.loadedDocId = docRef.id;
+              state.editor.slideName = slideName;
+              showNotification("別名でスライドを保存しました。", 'success');
+            }
+          } else {
+            if (existingDoc && existingDoc.id !== loadedId) {
+              const ok = await showConfirm(`同じ名前の別スライドがあります。上書きしますか？`);
+              if (!ok) return;
+              await updateDoc(doc(db, SLIDES_COLLECTION_PATH, existingDoc.id), dataToSave);
+              state.editor.loadedDocId = existingDoc.id;
+              state.editor.slideName = slideName;
+              showNotification("別スライドを上書き保存しました。", 'success');
+            } else {
+              await updateDoc(doc(db, SLIDES_COLLECTION_PATH, loadedId), dataToSave);
+              state.editor.slideName = slideName;
+              showNotification("スライドを更新しました。", 'success');
+            }
+          }
+        }
+      } catch (e) {
+        console.error(e);
+        showNotification("スライドの保存に失敗しました。", 'error');
+      } finally {
+        dom.saveSlidesBtn.disabled = false;
+        dom.saveSlidesBtn.textContent = "保存";
+        renderEditor();
+      }
+    }
+
+    async function handleLoadSlides() {
+      const nm = dom.slideNameInput.value.trim();
+      if (!nm) {
+        showNotification("ロードする名前を入力してください。", 'error');
+        return;
+      }
+      try {
+        dom.loadSlidesBtn.disabled = true;
+        dom.loadSlidesBtn.textContent = "ロード中...";
+        const docSnap = await findSlidesByName(nm);
+        if (docSnap) {
+          const data = docSnap.data();
+          state.editor.slides = (data.slides || []).map(s => ({
+            text_content: s.text_content || "",
+            image_url: s.image_url || "",
+            ...(typeof s.cpl === 'number' ? { cpl: s.cpl } : {})
+          }));
+          state.editor.currentSlideIndex = state.editor.slides.length > 0 ? 0 : -1;
+          state.editor.slideName = data.slideName;
+          state.editor.loadedDocId = docSnap.id;
+
+          state.viewerSettings = data.viewerSettings || { cpl: 25, minPx: 18, maxPx: 56 };
+          dom.viewerCplRange.value = String(state.viewerSettings.cpl);
+          dom.viewerCplLabel.textContent = String(state.viewerSettings.cpl);
+          dom.deckCplInline.textContent = state.viewerSettings.cpl;
+
+          dom.jsonInput.value = "";
+          showNotification(`スライド「${data.slideName}」をロードしました。`, 'success');
+        } else {
+          showNotification(`「${nm}」が見つかりませんでした。`, 'error');
+        }
+      } catch (e) {
+        console.error(e);
+        showNotification("スライドのロードに失敗しました。", 'error');
+      } finally {
+        dom.loadSlidesBtn.disabled = false;
+        dom.loadSlidesBtn.textContent = "ロード";
+        renderEditor();
+      }
+    }
+
+    async function handleStartViewer() {
+      const nm = dom.viewerSlideNameInput.value.trim();
+      if (!nm) {
+        showNotification("スライド名を入力してください。", 'error');
+        return;
+      }
+      try {
+        dom.startViewerBtn.disabled = true;
+        dom.startViewerBtn.textContent = "検索中...";
+        const docSnap = await findSlidesByName(nm);
+        if (docSnap) {
+          const data = docSnap.data();
+          state.viewer.slides = (data.slides || []).map(s => ({
+            text_content: s.text_content || "",
+            image_url: s.image_url || "",
+            ...(typeof s.cpl === 'number' ? { cpl: s.cpl } : {})
+          }));
+          state.viewer.currentSlideIndex = state.viewer.slides.length > 0 ? 0 : -1;
+          state.viewer.slideName = data.slideName;
+          state.viewerSettings = data.viewerSettings || { cpl: 25, minPx: 18, maxPx: 56 };
+        } else {
+          showNotification("スライドが見つかりませんでした。", 'error');
+          state.viewer.slides = [];
+        }
+      } catch (e) {
+        showNotification("読み込みに失敗しました。", 'error');
+      } finally {
+        dom.startViewerBtn.disabled = false;
+        dom.startViewerBtn.textContent = "スライドを見る";
+        renderViewer();
+      }
+    }
+
+    function clamp(v, min, max) { return Math.max(min, Math.min(max, v)); }
+
+    function setupViewerSizeControls() {
+      dom.viewerCplPresets?.addEventListener('click', (e) => {
+        const btn = e.target.closest('button[data-cpl]');
+        if (!btn) return;
+        [...dom.viewerCplPresets.querySelectorAll('button')].forEach(b => {
+          b.classList.remove('bg-indigo-50', 'text-indigo-700', 'font-semibold');
+        });
+        btn.classList.add('bg-indigo-50', 'text-indigo-700', 'font-semibold');
+        const v = Number(btn.dataset.cpl);
+        state.viewerSettings.cpl = clamp(v, CPL_MIN, CPL_MAX);
+        dom.viewerCplRange.value = String(state.viewerSettings.cpl);
+        dom.viewerCplLabel.textContent = String(state.viewerSettings.cpl);
+        dom.deckCplInline.textContent = state.viewerSettings.cpl;
+        if (!dom.viewerView.classList.contains('hidden')) autoSizeViewerText();
+        renderEditor();
+      });
+      dom.viewerCplRange?.addEventListener('input', () => {
+        const v = Number(dom.viewerCplRange.value);
+        state.viewerSettings.cpl = clamp(v, CPL_MIN, CPL_MAX);
+        dom.viewerCplLabel.textContent = String(state.viewerSettings.cpl);
+        dom.deckCplInline.textContent = state.viewerSettings.cpl;
+        if (!dom.viewerView.classList.contains('hidden')) autoSizeViewerText();
+        renderEditor();
+      });
+    }
+
+    function setupPerSlideSizeControls() {
+      dom.slideCplUp.addEventListener('click', () => {
+        const i = state.editor.currentSlideIndex; if (i < 0) return;
+        const s = state.editor.slides[i]; const base = getEffectiveCpl(s);
+        s.cpl = clamp((typeof s.cpl === 'number' ? s.cpl : base) - 1, CPL_MIN, CPL_MAX);
+        renderEditor();
+      });
+      dom.slideCplDown.addEventListener('click', () => {
+        const i = state.editor.currentSlideIndex; if (i < 0) return;
+        const s = state.editor.slides[i]; const base = getEffectiveCpl(s);
+        s.cpl = clamp((typeof s.cpl === 'number' ? s.cpl : base) + 1, CPL_MIN, CPL_MAX);
+        renderEditor();
+      });
+      dom.slideCplReset.addEventListener('click', () => {
+        const i = state.editor.currentSlideIndex; if (i < 0) return;
+        const s = state.editor.slides[i];
+        delete s.cpl;
+        renderEditor();
+      });
+    }
+
+    /* ▼▼▼ 追加：テキスト出力（ビルド＆コピー） ▼▼▼ */
+    function buildDeckPlainText() {
+      // 優先：編集中デッキ → 次点：閲覧中デッキ
+      const slides = (state.editor.slides && state.editor.slides.length)
+        ? state.editor.slides
+        : state.viewer.slides;
+
+      const name = (state.editor.slides && state.editor.slides.length)
+        ? (state.editor.slideName || "")
+        : (state.viewer.slideName || "");
+
+      if (!slides || !slides.length) return null;
+
+      const lines = [];
+      lines.push(`デッキ: ${name || "（未命名）"}`);
+      for (let i = 0; i < slides.length; i++) {
+        const s = slides[i] || {};
+        const body = (s.text_content || "").trim();
+        lines.push(`--- Slide ${i + 1} ---`);
+        lines.push(body.length ? body : "(本文なし)");
+      }
+      return lines.join("\n");
+    }
+
+    async function copyTextToClipboard(text) {
+      try {
+        if (navigator.clipboard && window.isSecureContext) {
+          await navigator.clipboard.writeText(text);
+          return true;
+        }
+      } catch (_) {}
+      try {
+        const ta = document.createElement("textarea");
+        ta.value = text;
+        ta.style.position = "fixed";
+        ta.style.left = "-9999px";
+        document.body.appendChild(ta);
+        ta.select();
+        const ok = document.execCommand("copy");
+        document.body.removeChild(ta);
+        return ok;
+      } catch (_) {
+        return false;
+      }
+    }
+    /* ▲▲▲ 追加ここまで ▲▲▲ */
+
+    function setupEventListeners() {
+      dom.tabEditor.addEventListener('click', () => handleModeChange('editor'));
+      dom.tabViewer.addEventListener('click', () => handleModeChange('viewer'));
+
+      dom.importJsonBtn.addEventListener('click', handleImportJson);
+      dom.textContentInput.addEventListener('input', () => { handleSlideUpdate(); });
+      dom.imageUrlInput.addEventListener('input', () => { handleSlideUpdate(); });
+
+      dom.editorPrevArrow.addEventListener('click', () => handleEditorNav(-1));
+      dom.editorNextArrow.addEventListener('click', () => handleEditorNav(1));
+
+      dom.saveSlidesBtn.addEventListener('click', handleSaveSlides);
+      dom.loadSlidesBtn.addEventListener('click', handleLoadSlides);
+
+      dom.deleteSlideLink.addEventListener('click', async () => {
+        const ok = await showConfirm("このスライド（ドキュメント）を完全に削除しますか？この操作は戻せません。");
+        if (!ok) return;
+        try {
+          if (state.editor.loadedDocId) {
+            await deleteDoc(doc(db, SLIDES_COLLECTION_PATH, state.editor.loadedDocId));
+            state.editor.slides = [];
+            state.editor.currentSlideIndex = -1;
+            state.editor.slideName = '';
+            state.editor.loadedDocId = null;
+            dom.slideNameInput.value = '';
+            renderEditor();
+            showNotification("スライドを削除しました。", 'success');
+          }
+        } catch (e) {
+          console.error(e);
+          showNotification("削除に失敗しました。", 'error');
+        }
+      });
+
+      dom.addSlideBtn.addEventListener('click', addSlide);
+      dom.removeSlideBtn.addEventListener('click', removeCurrentSlide);
+
+      dom.startViewerBtn.addEventListener('click', handleStartViewer);
+      dom.viewerPrevArrow.addEventListener('click', () => handleViewerNav(-1));
+      dom.viewerNextArrow.addEventListener('click', () => handleViewerNav(1));
+      dom.viewerBackBtn.addEventListener('click', handleViewerBack);
+
+      window.addEventListener('resize', () => {
+        if (!dom.viewerView.classList.contains('hidden')) autoSizeViewerText();
+        if (!dom.editorView.classList.contains('hidden')) autoSizeEditorText();
+      });
+
+      setupViewerSizeControls();
+      setupPerSlideSizeControls();
+
+      /* ▼ 追加：ボタンクリックでコピー */
+      dom.copyDeckTextBtn.addEventListener('click', async () => {
+        const text = buildDeckPlainText();
+        if (!text) {
+          showNotification("コピーできるスライドがありません。", "error");
+          return;
+        }
+        const ok = await copyTextToClipboard(text);
+        showNotification(ok ? "デッキのテキストをコピーしました。" : "コピーに失敗しました。", ok ? "success" : "error");
+      });
+      /* ▲ 追加ここまで */
+    }
+
+    function handleSlideUpdate() {
+      const { slides, currentSlideIndex } = state.editor;
+      if (currentSlideIndex !== -1) {
+        slides[currentSlideIndex].text_content = dom.textContentInput.value;
+        slides[currentSlideIndex].image_url = dom.imageUrlInput.value;
+        dom.editorSlideContainer.innerHTML = createSlideHTML(slides[currentSlideIndex], false);
+        renderReorderList();
+        autoSizeEditorText();
+      }
+    }
+
+    function handleViewerNav(dir) {
+      const { slides } = state.viewer;
+      const newIndex = state.viewer.currentSlideIndex + dir;
+      if (newIndex >= 0 && newIndex < slides.length) {
+        state.viewer.currentSlideIndex = newIndex;
+        renderViewer();
+      }
+    }
+
+    function handleViewerBack() {
+      state.viewer.slides = [];
+      state.viewer.currentSlideIndex = -1;
+      state.viewer.slideName = '';
+      dom.viewerSlideNameInput.value = '';
+      renderViewer();
+    }
+
+    async function main() {
+      setupEventListeners();
+      await initializeFirebase();
+      render();
+    }
+    main();
+  </script>
+</body>
+</html>
